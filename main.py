@@ -5,8 +5,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 # Import the Dectiger and ADRQN classes
-from dectiger import Dectiger
-from DRQN import DRQN
+from envs.dectiger import Dectiger
+from model.DRQN import DRQN
 
 vocab_actions = [("open-left", "open-left"), ("open-right", "open-right"), ("listen", "listen"), ("open-left", "open-right"), ("open-right", "open-left"), ("open-left", "listen"), ("listen", "open-right"), ("listen", "open-left"), ("open-right", "listen")]
 vocab_obs = [("None", "None"), ("hear-left", "hear-left"), ("hear-left", "hear-right"), ("hear-right", "hear-left"), ("hear-right", "hear-right")]

@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
-from ReplayBuffer import ReplayBuffer
-from RNN_Model import RNNModel
+from model.ReplayBuffer import ReplayBuffer
+from model.RNN_Model import RNNModel
 
 class DRQN:
     
