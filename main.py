@@ -5,8 +5,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 # Import the Dectiger and ADRQN classes
-from dectiger import Dectiger
-from DRQN import DRQN
+from envs.dectiger import Dectiger
+from model.DRQN import DRQN
 
 vocab_actions = [("open-left", "open-left"), ("open-right", "open-right"), ("listen", "listen"), ("open-left", "open-right"), ("open-right", "open-left"), ("open-left", "listen"), ("listen", "open-right"), ("listen", "open-left"), ("open-right", "listen")]
 vocab_obs = [("None", "None"), ("hear-left", "hear-left"), ("hear-left", "hear-right"), ("hear-right", "hear-left"), ("hear-right", "hear-right")]
@@ -72,7 +72,7 @@ def train(max_episodes, env, drqn):
             total_reward += r
             # Store the experience in the replay buffer
 
-            episodee.append((obs2index(o), obs2index(next_o), action2index(action), r, done))
+            episodee.append((np.array([[[obs2index(o)]]]), np.array([[[obs2index(next_o)]]]), action2index(action), r, done))
             o = next_o
 
             # Update the network
@@ -90,7 +90,7 @@ def train(max_episodes, env, drqn):
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
     plt.plot(total_rewards)
-    plt.savefig('total_rewards.png')
+    plt.savefig('./results/total_rewards.png')
     plt.show()
 
 

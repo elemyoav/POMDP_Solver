@@ -1,10 +1,10 @@
 import tensorflow as tf
 
 class RNNModel(tf.keras.Model):
-    def __init__(self, n_actions, hidden_units=32):
+    def __init__(self, n_actions, hidden_units=16):
         super(RNNModel, self).__init__()
-        self.dense1 = tf.keras.layers.Dense(64, activation='relu')
-        self.dense2 = tf.keras.layers.Dense(32, activation='tanh')
+        self.dense1 = tf.keras.layers.Dense(32, activation='relu')
+        self.dense2 = tf.keras.layers.Dense(16, activation='relu')
         self.lstm = tf.keras.layers.LSTM(hidden_units, return_state=True, return_sequences=False)
         self.linear = tf.keras.layers.Dense(n_actions, activation=None)
 
