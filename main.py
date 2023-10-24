@@ -90,7 +90,7 @@ def train(max_episodes, env, drqn):
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
     plt.plot(total_rewards)
-    plt.savefig('total_rewards.png')
+    plt.savefig('./results/total_rewards.png')
     plt.show()
 
 
