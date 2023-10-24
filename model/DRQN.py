@@ -5,10 +5,10 @@ from model.RNN_Model import RNNModel
 
 class DRQN:
     
-    def __init__(self, n_obs, n_actions, learning_rate=5e-5, gamma=0.99, max_len=100000, batch_size=64, N=2000):
+    def __init__(self, n_obs, n_actions, learning_rate=0.1, gamma=0.9, max_len=100000, batch_size=32, N=10000):
         self.n_obs = n_obs
         self.n_actions = n_actions
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
         self.gamma = gamma
 
         self.model = self.create_model()
@@ -55,32 +55,25 @@ class DRQN:
         episodes = self.replay_buffer.sample(self.batch_size)
         total_loss = 0
 
-        for episode in episodes:
-            old_network_state = None
-            new_network_state = None
+        with tf.GradientTape() as tape:
 
-            for o, next_o, action, reward, done in episode:
-                o = np.array([[[o]]])
-                next_o = np.array([[[next_o]]])
+            for episode in episodes:
+                old_network_state = None
+                new_network_state = None
 
-                # Compute the target Q-values
+                for o, next_o, action, reward, done in episode:
 
-                # Update the network
-                with tf.GradientTape() as tape:
+
                     old_q_vals, old_network_state = self.old_model(o, initial_state=old_network_state)
                     max_q_val = np.max(old_q_vals)
                     new_q_vals, new_network_state = self.model(next_o, initial_state=new_network_state)
-
-                    target = new_q_vals.numpy()
-                    target[0][action] = reward + self.gamma * max_q_val * (1 - done)
-                    target = tf.convert_to_tensor(target)
-
-                    loss = tf.keras.losses.MSE(target, new_q_vals)
+                        
+                    loss = (reward + self.gamma * max_q_val * (1 - done) - new_q_vals[0][action])**2
                     total_loss += loss
+                    self.catch_up()
 
-                grads = tape.gradient(loss, self.model.trainable_variables)
-                self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-                self.catch_up()
+        grads = tape.gradient(loss, self.model.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
 
         total_loss /= self.batch_size
         print("Loss: {}".format(total_loss))

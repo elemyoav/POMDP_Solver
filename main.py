@@ -72,7 +72,7 @@ def train(max_episodes, env, drqn):
             total_reward += r
             # Store the experience in the replay buffer
 
-            episodee.append((obs2index(o), obs2index(next_o), action2index(action), r, done))
+            episodee.append((np.array([[[obs2index(o)]]]), np.array([[[obs2index(next_o)]]]), action2index(action), r, done))
             o = next_o
 
             # Update the network
