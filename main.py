@@ -41,7 +41,7 @@ actions = []
 drqn = DRQN(n_obs, n_actions)
 
 # Initialize progress plot
-def train(max_episodes, env, drqn):
+def train(max_episodes, env, drqn:DRQN):
     # Training loop
     total_rewards = []
     epsilon = epsilon_start
@@ -55,7 +55,7 @@ def train(max_episodes, env, drqn):
         env.reset()
         done = False
         total_reward = 0
-        o = "None", "None"
+        o = 'None', 'None'
 
         episodee = []
         while not done:
@@ -72,8 +72,9 @@ def train(max_episodes, env, drqn):
             total_reward += r
             # Store the experience in the replay buffer
 
-            episodee.append((np.array([[[obs2index(o)]]]), np.array([[[obs2index(next_o)]]]), action2index(action), r, done))
+            episodee.append((drqn.one_hot(obs2index(o)), drqn.one_hot(obs2index(next_o)), action2index(action), r, done))
             o = next_o
+            
 
             # Update the network
             drqn.update()
@@ -94,27 +95,36 @@ def train(max_episodes, env, drqn):
     plt.show()
 
 
-def test(max_episodes, env, drqn):
+def test(max_episodes, env, drqn:DRQN):
     total_rewards = []
 
+    episodee = []
     for episode in range(max_episodes):
         env.reset()
         done = False
         total_reward = 0
         o = "None", "None"
 
+        print("Episode begin")
+        print("----------------------")
         while not done:
             # Get the action
+
+            print("++++++++++++++++++++++")
+            print("o: {}".format(o))
             action = drqn.act(obs2index(o), 0)
             action = index2action(action)
+            print("action: {}".format(action))
+            print("++++++++++++++++++++++")
 
             # Execute the action
             next_o, r, done = env.step(action)
-
             # Reset the hidden state and add to total reward
             if done:
                 drqn.reset_hidden_state()
             total_reward += r
+
+            episodee.append((drqn.one_hot(obs2index(o)), drqn.one_hot(obs2index(next_o)), action2index(action), r, done))
             o = next_o
 
             drqn.update()
@@ -122,6 +132,7 @@ def test(max_episodes, env, drqn):
         print("test episode: {}, total reward: {}".format(episode, total_reward))
 
         total_rewards.append(total_reward)
+        drqn.replay_buffer.add(episodee)
     
     avg_total_reward = np.mean(total_rewards)
     print("Average total reward: {}".format(avg_total_reward))
@@ -130,3 +141,4 @@ def test(max_episodes, env, drqn):
 
 if __name__ == "__main__":
     train(max_episodes, env, drqn)
+

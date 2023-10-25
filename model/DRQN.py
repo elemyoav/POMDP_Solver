@@ -5,7 +5,7 @@ from model.RNN_Model import RNNModel
 
 class DRQN:
     
-    def __init__(self, n_obs, n_actions, learning_rate=0.1, gamma=0.9, max_len=100000, batch_size=32, N=10000):
+    def __init__(self, n_obs, n_actions, learning_rate=2e-2, gamma=0.9, max_len=100000, batch_size=32, N=1000):
         self.n_obs = n_obs
         self.n_actions = n_actions
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
@@ -21,6 +21,11 @@ class DRQN:
         self.N = N
         self.hidden_state = None
     
+    def one_hot(self, obs):
+        one_hot = np.zeros(self.n_obs)
+        one_hot[obs] = 1
+        return one_hot
+    
     def create_model(self):
         model = RNNModel(self.n_actions)
         model.compile(loss='mse', optimizer=self.optimizer)
@@ -31,8 +36,8 @@ class DRQN:
         if np.random.rand() < epsilon:
             return np.random.randint(self.n_actions)
         else:
-            obs = np.array([[[obs]]])
-            q_values, self.hidden_state = self.model(obs, initial_state=self.hidden_state)  
+            obs = np.array([[self.one_hot(obs)]])
+            q_values, self.hidden_state = self.model(obs, initial_state=self.hidden_state)
             action = np.argmax(q_values)  # Get the action with the highest Q-value
             return action
     
@@ -55,25 +60,28 @@ class DRQN:
         episodes = self.replay_buffer.sample(self.batch_size)
         total_loss = 0
 
-        with tf.GradientTape() as tape:
+        for episode in episodes:
+            old_network_state = None
+            new_network_state = None
 
-            for episode in episodes:
-                old_network_state = None
-                new_network_state = None
+            for o, next_o, action, reward, done in episode:
 
-                for o, next_o, action, reward, done in episode:
-
-
+                o, next_o = np.array([[o]]), np.array([[next_o]])
+                with tf.GradientTape() as tape:
                     old_q_vals, old_network_state = self.old_model(o, initial_state=old_network_state)
                     max_q_val = np.max(old_q_vals)
                     new_q_vals, new_network_state = self.model(next_o, initial_state=new_network_state)
-                        
-                    loss = (reward + self.gamma * max_q_val * (1 - done) - new_q_vals[0][action])**2
-                    total_loss += loss
-                    self.catch_up()
 
-        grads = tape.gradient(loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+                    target = new_q_vals.numpy()
+                    target[0][action] = reward + self.gamma * max_q_val * (1 - done)
+                    target = tf.convert_to_tensor(target)
+
+                    
+                    loss = tf.keras.losses.MSE(target, new_q_vals)
+
+                self.optimizer.minimize(loss, self.model.trainable_variables, tape=tape)
+                total_loss += loss
+                self.catch_up()
 
         total_loss /= self.batch_size
         print("Loss: {}".format(total_loss))
