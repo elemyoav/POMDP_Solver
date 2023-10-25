@@ -45,7 +45,7 @@ pip install -r requirements.txt
 Now that you have set up the environment and installed the required packages, you can start running the training process. Use the following command to run the training script:
 
 ```shell
-./python3/main.py
+python3 ./main.py
 ```
 
 During training, you'll see progress and updates on the screen. The resulting plot will be saved in the "results" directory within the project.
