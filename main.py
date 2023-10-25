@@ -47,7 +47,7 @@ def train(max_episodes, env, drqn:DRQN):
     epsilon = epsilon_start
 
     for episode in tqdm(range(max_episodes)):
-
+        
         if episode % 100 == 0 and episode != 0:
             test_reward = test(100, env, drqn)
             total_rewards.append(test_reward)
@@ -98,7 +98,7 @@ def train(max_episodes, env, drqn:DRQN):
 def test(max_episodes, env, drqn:DRQN):
     total_rewards = []
 
-    episodee = []
+    
     for episode in range(max_episodes):
         env.reset()
         done = False
@@ -107,6 +107,7 @@ def test(max_episodes, env, drqn:DRQN):
 
         print("Episode begin")
         print("----------------------")
+        episodee = []
         while not done:
             # Get the action
 

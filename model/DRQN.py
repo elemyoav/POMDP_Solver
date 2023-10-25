@@ -5,7 +5,7 @@ from model.RNN_Model import RNNModel
 
 class DRQN:
     
-    def __init__(self, n_obs, n_actions, learning_rate=2e-2, gamma=0.9, max_len=100000, batch_size=32, N=1000):
+    def __init__(self, n_obs, n_actions, learning_rate=5e-2, gamma=0.8, max_len=100000, batch_size=64, N=10000):
         self.n_obs = n_obs
         self.n_actions = n_actions
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
@@ -56,17 +56,19 @@ class DRQN:
         if len(self.replay_buffer) < self.batch_size:
             return
         
-        # Sample a batch of transitions from replay buffer
+        # Sample a batch of transitions from the replay buffer
         episodes = self.replay_buffer.sample(self.batch_size)
         total_loss = 0
 
         for episode in episodes:
             old_network_state = None
             new_network_state = None
+            accumulated_grads = [tf.Variable(tf.zeros_like(var)) for var in self.model.trainable_variables]  # Initialize gradients for the episode
+            episode_loss = 0  # Initialize loss for this episode
 
             for o, next_o, action, reward, done in episode:
-
                 o, next_o = np.array([[o]]), np.array([[next_o]])
+
                 with tf.GradientTape() as tape:
                     old_q_vals, old_network_state = self.old_model(o, initial_state=old_network_state)
                     max_q_val = np.max(old_q_vals)
@@ -76,15 +78,25 @@ class DRQN:
                     target[0][action] = reward + self.gamma * max_q_val * (1 - done)
                     target = tf.convert_to_tensor(target)
 
-                    
                     loss = tf.keras.losses.MSE(target, new_q_vals)
+                    episode_loss += loss
 
-                self.optimizer.minimize(loss, self.model.trainable_variables, tape=tape)
-                total_loss += loss
-                self.catch_up()
+                # Accumulate gradients for this episode
+                grads = tape.gradient(loss, self.model.trainable_variables)
+                for i, grad in enumerate(grads):
+                    accumulated_grads[i].assign_add(grad)
+
+            total_loss += episode_loss
+
+            # Apply gradients at the end of each episode
+            self.optimizer.apply_gradients(zip(accumulated_grads, self.model.trainable_variables))
+
+            self.catch_up()
 
         total_loss /= self.batch_size
+
         print("Loss: {}".format(total_loss))
+
         
 
 

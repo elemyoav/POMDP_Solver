@@ -21,7 +21,7 @@ class Dectiger:
 
     def O(self, actions):
         if all([action == "listen" for action in actions]):
-            if self.s == "tiger-left":
+            if self.s == self.S[0]:
                 dice = random.random()
                 if dice < 0.7225:
                     return "hear-left", "hear-left"
