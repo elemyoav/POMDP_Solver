@@ -5,7 +5,7 @@ from model.RNN_Model import RNNModel
 
 class DRQN:
     
-    def __init__(self, n_obs, n_actions, learning_rate=5e-2, gamma=0.8, max_len=100000, batch_size=64, N=10000):
+    def __init__(self, n_obs, n_actions, learning_rate=5e-5, gamma=0.8, max_len=100000, batch_size=64, N=10000):
         self.n_obs = n_obs
         self.n_actions = n_actions
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
