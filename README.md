@@ -1,6 +1,6 @@
-# Project Name README
+# DRQN README
 
-This document provides instructions on how to download and use the "Project Name" project. Follow these steps to get started:
+This document provides instructions on how to download and use the "DRQN" project. Follow these steps to get started:
 
 ## Step 1: Clone the Repository
 
@@ -50,4 +50,4 @@ python3 ./main.py
 
 During training, you'll see progress and updates on the screen. The resulting plot will be saved in the "results" directory within the project.
 
-You are now ready to use the "Project Name" project. If you encounter any issues or have questions, please refer to the project's documentation or seek assistance from the project's maintainers. Enjoy working on your project!
+You are now ready to use the "DRQN" project. If you encounter any issues or have questions, please refer to the project's documentation or seek assistance from the project's maintainers. Enjoy working on your project!
