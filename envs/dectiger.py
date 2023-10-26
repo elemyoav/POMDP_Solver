@@ -1,23 +1,36 @@
 import random
-
+import numpy as np
 class Dectiger:
     def __init__(self):
         self.S = ["tiger-left", "tiger-right"]
         self.A = ["open-left", "open-right", "listen"]
         self.numAgents = 2
         self.s = None
-        self.horizon = 30
+        self.horizon = 5
         self.currentStep = 0
+
+        self.action_space = [("open-left", "open-left"), ("open-right", "open-right"), ("listen", "listen"), ("open-left", "open-right"), ("open-right", "open-left"), ("open-left", "listen"), ("listen", "open-right"), ("listen", "open-left"), ("open-right", "listen")]
+        self.observation_space = [("None", "None"), ("hear-left", "hear-left"), ("hear-left", "hear-right"), ("hear-right", "hear-left"), ("hear-right", "hear-right")]
+        self.n_obs = len(self.observation_space)
 
     def reset(self):
         self.s = random.choice(self.S)
+        return self.one_hot(("None", "None"))
 
+    def one_hot(self, obs):
+        one_hot = np.zeros(self.n_obs)
+        one_hot[self.observation_space.index(obs)] = 1
+        return one_hot
+    
     def step(self, actions):
         self.currentStep += 1
-        if self.currentStep >= self.horizon or self.done(actions):
+        if self.done(actions):
             self.currentStep = 0
-            return self.O(actions), self.R(actions), True
-        return self.O(actions), self.R(actions), False
+            return self.one_hot(self.O(actions)), self.R(actions), True
+        if self.currentStep >= self.horizon:
+            self.currentStep = 0
+            return self.one_hot(self.O(actions)), -200, True
+        return self.one_hot(self.O(actions)), self.R(actions), False
 
     def O(self, actions):
         if all([action == "listen" for action in actions]):
