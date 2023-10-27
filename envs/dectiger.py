@@ -1,12 +1,13 @@
 import random
 import numpy as np
+
 class Dectiger:
     def __init__(self):
         self.S = ["tiger-left", "tiger-right"]
         self.A = ["open-left", "open-right", "listen"]
         self.numAgents = 2
         self.s = None
-        self.horizon = 5
+        self.horizon = 30
         self.currentStep = 0
 
         self.action_space = [("open-left", "open-left"), ("open-right", "open-right"), ("listen", "listen"), ("open-left", "open-right"), ("open-right", "open-left"), ("open-left", "listen"), ("listen", "open-right"), ("listen", "open-left"), ("open-right", "listen")]
@@ -24,6 +25,7 @@ class Dectiger:
     
     def step(self, actions):
         self.currentStep += 1
+        actions = self.action_space[actions]
         if self.done(actions):
             self.currentStep = 0
             return self.one_hot(self.O(actions)), self.R(actions), True
