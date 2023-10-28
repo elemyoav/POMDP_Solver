@@ -66,6 +66,7 @@ You can specify these arguments when running the training script. For example, t
 
 ```shell
 python3 ./main.py --lr 0.001
+```
 
 During training, you'll see progress and updates on the screen. The resulting plot will be saved in the "results" directory within the project.
 
