@@ -1,5 +1,5 @@
 from numpy.core.numeric import indices
-from envs.multiagentenv import MultiAgentEnv
+from dec_envs.multiagentenv import MultiAgentEnv
 from utils.dict2namedtuple import convert
 import numpy as np
 
@@ -24,7 +24,7 @@ class DecTiger(MultiAgentEnv):
             self.failure_obs_prob = getattr(args, "failure_obs_prob", 0.15)
 
         # Define the agents and actions
-        self.n_agents = 2
+        self.n_agents = getattr(args, "n_agents", 2)
         self.n_actions = 3 # Listen Left/Listen Right/Nothing
         self.episode_limit = getattr(args, "episode_limit", 4)
 

@@ -7,42 +7,15 @@ import argparse
 import numpy as np
 import random
 from tqdm import tqdm
-from envs.multiagentenv import MultiAgentEnv
+from envs.decpomdp2pomdp import DecPOMDPWrapper
 
 tf.keras.backend.set_floatx('float64')
 
-
-ACTION2ACIONS = {
-    0: [0, 0],
-    1: [1, 0],
-    2: [2, 0],
-    3: [0, 1],
-    4: [1, 1],
-    5: [2, 1],
-    6: [0, 2],
-    7: [1, 2],
-    8: [2, 2]
-}
-
-
-ACTIONS2ACTION = {
-    (0, 0): 0,
-    (1, 0): 1,
-    (2, 0): 2,
-    (0, 1): 3,
-    (1, 1): 4,
-    (2, 1): 5,
-    (0, 2): 6,
-    (1, 2): 7,
-    (2, 2): 8
-}
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--gamma', type=float, default=0.95)
-parser.add_argument('--lr', type=float, default=5e-3)
-parser.add_argument('--batch_size', type=int, default=32)
-parser.add_argument('--time_steps', type=int, default=30)
+parser.add_argument('--lr', type=float, default=4e-4)
+parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--time_steps', type=int, default=4)
 parser.add_argument('--eps', type=float, default=1.0)
 parser.add_argument('--eps_decay', type=float, default=0.9995)
 parser.add_argument('--eps_min', type=float, default=0.01)
@@ -56,15 +29,15 @@ class ActionStateModel:
         self.action_dim = aciton_dim
         self.epsilon = args.eps
 
-        self.opt = RMSprop(args.lr)
+        self.opt = Adam(args.lr)
         self.compute_loss = tf.keras.losses.MeanSquaredError()
         self.model = self.create_model()
 
     def create_model(self):
         return tf.keras.Sequential([
             Input((args.time_steps, self.state_dim)),
-            LSTM(32),
-            Dense(16, activation='relu'),
+            LSTM(64),
+            Dense(64, activation='relu'),
             Dense(self.action_dim)
         ])
 
@@ -93,10 +66,10 @@ class ActionStateModel:
 
 
 class Agent:
-    def __init__(self, env: MultiAgentEnv, N=15):
-        self.env: MultiAgentEnv = env
-        self.state_dim = env.get_obs_size()**self.env.n_agents
-        self.action_dim = self.env.get_total_actions() ** self.env.n_agents
+    def __init__(self, env: DecPOMDPWrapper, N=15):
+        self.env: DecPOMDPWrapper = env
+        self.state_dim = env.observation_space.n
+        self.action_dim = self.env.action_space.n
 
         self.states = np.zeros([args.time_steps, self.state_dim])
 
@@ -139,16 +112,13 @@ class Agent:
 
                 done, total_reward = False, 0
                 self.states = np.zeros([args.time_steps, self.state_dim])
-                o = self.env.reset()[0][0].flatten()
-                self.update_states(o)
+                self.update_states(self.env.reset())
                 while not done:
                     action = self.model.get_action(self.states)
-                    actions = self.action2actions(action)
-                    reward, done, _ = self.env.step(actions)
-                    next_state = self.env.get_obs()[0].flatten()
+                    next_obs, reward, done, _, _ = self.env.step(action)
 
                     prev_states = self.states
-                    self.update_states(next_state)
+                    self.update_states(next_obs)
                     self.buffer.put(prev_states, action,
                                     reward*0.01, self.states, done)
                     total_reward += reward
@@ -164,26 +134,23 @@ class Agent:
 
 
     def test(self, max_episodes=100):
+
         total_rewards = []
         epsilon = self.model.epsilon
         self.model.epsilon = 0
         for ep in range(max_episodes):
             done, total_reward = False, 0
             self.states = np.zeros([args.time_steps, self.state_dim])
-            o = self.env.reset()[0][0].flatten()
-            self.update_states(o)
+            self.update_states(self.env.reset())
             while not done:
                 action = self.model.get_action(self.states)
-                actions = self.action2actions(action)
-                reward, done, _ = self.env.step(actions)
-                next_state = self.env.get_obs()[0].flatten()
+                next_obs, reward, done, _, _ = self.env.step(action)
 
                 prev_states = self.states
-                self.update_states(next_state)
-                self.buffer.put(prev_states, action, reward *
-                                0.01, self.states, done)
-
+                self.update_states(next_obs)
+                self.buffer.put(prev_states, action, reward*0.01, self.states, done)
                 total_reward += reward
+
             total_rewards.append(total_reward)
 
         print('Test Average Reward: {}'.format(np.mean(total_rewards)))
@@ -191,20 +158,13 @@ class Agent:
         return np.mean(total_rewards)
 
     def catch_up(self):
+
         if self.n == self.N:
             self.n = 0
             self.target_update()
             print("Catching up...")
         else:
             self.n += 1
-
-    def action2actions(self, action):
-
-        return ACTION2ACIONS[action]
-
-    def actions2action(self, actions):
-        return ACTIONS2ACTION[tuple(actions)]
-
 
     def plot_data(self, data):
             plt.xlabel('Episode')

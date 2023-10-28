@@ -1,10 +1,10 @@
-from envs.dec_tiger import DecTiger
+from envs.tiger import Tiger
 from model.DRQN import Agent
 
 def main():
-    env = DecTiger(**{"env_args": {}})
+    env = Tiger()
     agent = Agent(env)
-    agent.train(max_episodes=2000)
+    agent.train(max_episodes=1500)
 
 if __name__ == "__main__":
     main()
