@@ -9,6 +9,8 @@ import random
 from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
 
+tf.keras.layers
+
 tf.keras.backend.set_floatx('float64')
 
 parser = argparse.ArgumentParser()
@@ -120,7 +122,7 @@ class Agent:
                     prev_states = self.states
                     self.update_states(next_obs)
                     self.buffer.put(prev_states, action,
-                                    reward*0.01, self.states, done)
+                                    reward, self.states, done)
                     total_reward += reward
 
                 if self.buffer.size() >= args.batch_size:
@@ -148,7 +150,7 @@ class Agent:
 
                 prev_states = self.states
                 self.update_states(next_obs)
-                self.buffer.put(prev_states, action, reward*0.01, self.states, done)
+                self.buffer.put(prev_states, action, reward, self.states, done)
                 total_reward += reward
 
             total_rewards.append(total_reward)

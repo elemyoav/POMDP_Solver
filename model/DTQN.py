@@ -9,12 +9,13 @@ import numpy as np
 import random
 from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
+from layers.positional_encoding import PositionalEncoding
 
 tf.keras.backend.set_floatx('float64')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--gamma', type=float, default=0.95)
-parser.add_argument('--lr', type=float, default=4e-4)
+parser.add_argument('--lr', type=float, default=2e-2)
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--time_steps', type=int, default=4)
 parser.add_argument('--eps', type=float, default=1.0)
@@ -34,9 +35,9 @@ class ActionStateModel:
         self.model = self.create_model(
                                         input_shape=(self.state_dim, args.time_steps),
                                         num_actions=self.action_dim, 
-                                        num_heads=2,
+                                        num_heads=4,
                                         dff=64,
-                                        num_layers=2, 
+                                        num_layers=4, 
                                         max_seq_length=args.time_steps
                                       )
 
@@ -48,8 +49,8 @@ class ActionStateModel:
         # Embedding layer
         embedding_layer = Embedding(input_dim=max_seq_length, output_dim=dff)(input_seq)
 
-        # Transformer encoder layers
-        x = embedding_layer
+        x = embedding_layer + PositionalEncoding(max_seq_length, dff)(embedding_layer)
+
         for _ in range(num_layers):
             attn_output = MultiHeadAttention(num_heads=num_heads, key_dim=dff // num_heads)(x, x, x)
             x = LayerNormalization(epsilon=1e-6)(x + attn_output)
@@ -150,7 +151,7 @@ class Agent:
                     prev_states = self.states
                     self.update_states(next_obs)
                     self.buffer.put(prev_states, action,
-                                    reward*0.01, self.states, done)
+                                    reward, self.states, done)
                     total_reward += reward
 
                 if self.buffer.size() >= args.batch_size:
@@ -178,7 +179,7 @@ class Agent:
 
                 prev_states = self.states
                 self.update_states(next_obs)
-                self.buffer.put(prev_states, action, reward*0.01, self.states, done)
+                self.buffer.put(prev_states, action, reward, self.states, done)
                 total_reward += reward
 
             total_rewards.append(total_reward)
