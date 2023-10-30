@@ -1,8 +1,8 @@
 from envs.tiger import Tiger
 from envs.box_pushing import BoxPushing
 
-from model.DTQN import Agent as DTQNAgent
-from model.DRQN import Agent as DRQNAgent
+from architectures.DTQN import Agent as DTQNAgent
+from architectures.DRQN import Agent as DRQNAgent
 
 from args import args
 
