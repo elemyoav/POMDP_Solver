@@ -1,12 +1,10 @@
 from envs.tiger import Tiger
+from envs.box_pushing import BoxPushing
+
 from model.DTQN import Agent as DTQNAgent
 from model.DRQN import Agent as DRQNAgent
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default='DTQN')
-parser.add_argument('--env', type=str, default='Tiger')
-parser.add_argument('--max_episodes', type=int, default=1500)
-args = parser.parse_args()
+
+from args import args
 
 def main():
     env = choose_env(args.env)
@@ -16,6 +14,8 @@ def main():
 def choose_env(env_name):
     if env_name == 'Tiger':
         return Tiger()
+    elif env_name == 'BoxPushing':
+        return BoxPushing()
     else:
         raise NotImplementedError
     

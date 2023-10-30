@@ -4,25 +4,13 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
 from buffers.ReplayBuffer import ReplayBuffer
-import argparse
+from args import args
 import numpy as np
 import random
 from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
-from layers.positional_encoding import PositionalEncoding
 
 tf.keras.backend.set_floatx('float64')
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--gamma', type=float, default=0.95)
-parser.add_argument('--lr', type=float, default=2e-2)
-parser.add_argument('--batch_size', type=int, default=64)
-parser.add_argument('--time_steps', type=int, default=4)
-parser.add_argument('--eps', type=float, default=1.0)
-parser.add_argument('--eps_decay', type=float, default=0.9995)
-parser.add_argument('--eps_min', type=float, default=0.01)
-
-args = parser.parse_args()
 
 class ActionStateModel:
     def __init__(self, state_dim, aciton_dim):
@@ -49,7 +37,7 @@ class ActionStateModel:
         # Embedding layer
         embedding_layer = Embedding(input_dim=max_seq_length, output_dim=dff)(input_seq)
 
-        x = embedding_layer + PositionalEncoding(max_seq_length, dff)(embedding_layer)
+        x = embedding_layer
 
         for _ in range(num_layers):
             attn_output = MultiHeadAttention(num_heads=num_heads, key_dim=dff // num_heads)(x, x, x)

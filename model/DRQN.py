@@ -3,26 +3,15 @@ from tensorflow.keras.layers import Input, Dense, LSTM
 from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
 from buffers.ReplayBuffer import ReplayBuffer
-import argparse
 import numpy as np
 import random
 from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
+from args import args
 
 tf.keras.layers
 
 tf.keras.backend.set_floatx('float64')
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--gamma', type=float, default=0.95)
-parser.add_argument('--lr', type=float, default=4e-4)
-parser.add_argument('--batch_size', type=int, default=64)
-parser.add_argument('--time_steps', type=int, default=4)
-parser.add_argument('--eps', type=float, default=1.0)
-parser.add_argument('--eps_decay', type=float, default=0.9995)
-parser.add_argument('--eps_min', type=float, default=0.01)
-
-args = parser.parse_args()
 
 
 class ActionStateModel:
@@ -38,8 +27,8 @@ class ActionStateModel:
     def create_model(self):
         return tf.keras.Sequential([
             Input((args.time_steps, self.state_dim)),
-            LSTM(64),
-            Dense(64, activation='relu'),
+            LSTM(512),
+            Dense(1024, activation='relu'),
             Dense(self.action_dim)
         ])
 
@@ -140,7 +129,8 @@ class Agent:
         total_rewards = []
         epsilon = self.model.epsilon
         self.model.epsilon = 0
-        for ep in range(max_episodes):
+        #lets add to the for loop a testing.. tqdm format
+        for ep in tqdm(range(max_episodes), desc="Testing..."):
             done, total_reward = False, 0
             self.states = np.zeros([args.time_steps, self.state_dim])
             self.update_states(self.env.reset())
