@@ -1,28 +1,18 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Dense, MultiHeadAttention, LayerNormalization, Embedding
-from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, LSTM
 from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
 from buffers.ReplayBuffer import ReplayBuffer
-import argparse
 import numpy as np
 import random
 from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
-from layers.positional_encoding import PositionalEncoding
+from args import args
+
+tf.keras.layers
 
 tf.keras.backend.set_floatx('float64')
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--gamma', type=float, default=0.95)
-parser.add_argument('--lr', type=float, default=2e-2)
-parser.add_argument('--batch_size', type=int, default=64)
-parser.add_argument('--time_steps', type=int, default=4)
-parser.add_argument('--eps', type=float, default=1.0)
-parser.add_argument('--eps_decay', type=float, default=0.9995)
-parser.add_argument('--eps_min', type=float, default=0.01)
-
-args = parser.parse_args()
 
 class ActionStateModel:
     def __init__(self, state_dim, aciton_dim):
@@ -32,50 +22,22 @@ class ActionStateModel:
 
         self.opt = Adam(args.lr)
         self.compute_loss = tf.keras.losses.MeanSquaredError()
-        self.model = self.create_model(
-                                        input_shape=(self.state_dim, args.time_steps),
-                                        num_actions=self.action_dim, 
-                                        num_heads=4,
-                                        dff=64,
-                                        num_layers=4, 
-                                        max_seq_length=args.time_steps
-                                      )
+        self.model = self.create_model()
 
-    
-    def create_model(self, input_shape, num_actions, num_heads, dff, num_layers, max_seq_length):
-    # Input for state sequence
-        input_seq = Input(shape=input_shape, dtype=tf.int32, name="input_sequence")
-
-        # Embedding layer
-        embedding_layer = Embedding(input_dim=max_seq_length, output_dim=dff)(input_seq)
-
-        x = embedding_layer + PositionalEncoding(max_seq_length, dff)(embedding_layer)
-
-        for _ in range(num_layers):
-            attn_output = MultiHeadAttention(num_heads=num_heads, key_dim=dff // num_heads)(x, x, x)
-            x = LayerNormalization(epsilon=1e-6)(x + attn_output)
-            ffn_output = Dense(dff, activation="relu")(x)
-            x = LayerNormalization(epsilon=1e-6)(x + ffn_output)
-
-        # Global Average Pooling
-        x = tf.reduce_mean(x, axis=1)
-
-        # Output layer for action values
-        output = Dense(num_actions, activation="linear", name="action_values")(x)
-
-        # Create the DTQN model
-        model = Model(inputs=input_seq, outputs=output, name="dtqn_model")
-
-        return model
-
+    def create_model(self):
+        return tf.keras.Sequential([
+            Input((args.time_steps, self.state_dim)),
+            LSTM(512),
+            Dense(1024, activation='relu'),
+            Dense(self.action_dim)
+        ])
 
     def predict(self, state):
-        results = self.model.predict(state, verbose=0)
-        return results
+        return self.model.predict(state, verbose=0)
 
     def get_action(self, state):
         state = np.reshape(state, [1, args.time_steps, self.state_dim])
-        q_value = self.predict(state)[0][-1]
+        q_value = self.predict(state)[0]
         if np.random.random() < self.epsilon:
             return random.randint(0, self.action_dim-1)
         return np.argmax(q_value)
@@ -121,11 +83,9 @@ class Agent:
         for _ in range(epochs):
             states, actions, rewards, next_states, done = self.buffer.sample()
             targets = self.model.predict(states)
-            next_q_values = self.target_model.predict(next_states)
-            max_q_values = np.array([x[-1].max() for x in next_q_values])
-                
-            targets[range(args.batch_size), -1, actions] = rewards + \
-                (1-done) * max_q_values * args.gamma
+            next_q_values = self.target_model.predict(next_states).max(axis=1)
+            targets[range(args.batch_size), actions] = rewards + \
+                (1-done) * next_q_values * args.gamma
             self.model.train(states, targets)
 
     def update_states(self, next_state):
@@ -163,13 +123,18 @@ class Agent:
         finally:
             self.plot_data(progression)
 
+            c = input('Save model? [y/n]')
+            if c == 'y':
+                self.model.model.save(f'./models/DRQN_{args.env}.h5')
+
 
     def test(self, max_episodes=100):
 
         total_rewards = []
         epsilon = self.model.epsilon
         self.model.epsilon = 0
-        for ep in range(max_episodes):
+        #lets add to the for loop a testing.. tqdm format
+        for ep in tqdm(range(max_episodes), desc="Testing..."):
             done, total_reward = False, 0
             self.states = np.zeros([args.time_steps, self.state_dim])
             self.update_states(self.env.reset())
@@ -201,5 +166,5 @@ class Agent:
             plt.xlabel('Episode')
             plt.ylabel('Total Reward')
             plt.plot(data)
-            plt.savefig('./results/total_rewards_dtqn.png')
+            plt.savefig(f'./results/total_rewards_{args.env}_{args.model}.png')
             plt.show()

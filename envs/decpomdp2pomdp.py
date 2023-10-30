@@ -8,7 +8,7 @@ class DecPOMDPWrapper(Env):
     def __init__(self, env: MultiAgentEnv, action2actions, actions2action):
         self.env = env
         self.action_space:Discrete = Discrete(n=self.env.get_total_actions()**self.env.n_agents)
-        self.observation_space:Discrete = Discrete(n=self.env.get_obs_size()**self.env.n_agents)
+        self.observation_space:Discrete = Discrete(n=self.env.get_obs_size()*self.env.n_agents)
         self.action2actions = action2actions
         self.actions2action = actions2action
 
