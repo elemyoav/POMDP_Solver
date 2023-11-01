@@ -1,35 +1,41 @@
-from envs.box_pushing import BoxPushing
+import tensorflow as tf
+from tensorflow.keras.layers import Input, MultiHeadAttention, LayerNormalization, Dense
 
+def create_attention_network(input_shape, num_heads, key_dim, your_output_units, num_layers=4):
+    # Input layer
+    inputs = Input(shape=input_shape)
+    
+    x = inputs
+    for _ in range(num_layers):
+    # Multi-Head Attention
+        attention_output = MultiHeadAttention(num_heads=num_heads, key_dim=key_dim)(x, x, x, use_causal_mask=True)
+        
+        # Normalize the attention output
+        x = LayerNormalization(epsilon=1e-6)(x + attention_output)
+    
+    # Global Average Pooling
+    mean_output = tf.reduce_mean(x, axis=1)
+    
+    # Output layer
+    output = Dense(units=your_output_units, activation=None)(mean_output)
+    
+    # Create the model
+    model = tf.keras.Model(inputs=inputs, outputs=output)
+    
+    return model
 
-env = BoxPushing()
+# Example usage
+input_shape = (20, 8)
+num_heads = 4
+key_dim = 32
+your_output_units = 125  # Adjust as needed
 
-actions = [[i,j] for i in range(15) for j in range(15)]
+attention_model = create_attention_network(input_shape, num_heads, key_dim, your_output_units)
 
-actions2action = {
-    tuple(actions): k for k, actions in enumerate(actions)
-}
+attention_model.summary()
 
-
-
-# 0 - N
-# 1-  L
-# 2 - R
-# 3 - U
-# 4 - D
-# 5 - Sense small
-# 6 - Sense large
-# 7 - push small L
-# 8 - push small R
-# 9 - push small U
-# 10 - push small D
-# 11 - push large L
-# 12 - push large R
-# 13 - push large U
-# 14 - push large D
-
-print(env.reset())
-
-while True:
-    action = int(input())
-    print(env.step(actions2action[(action,action)]))
-
+input = tf.random.uniform(shape=(1, 20, 8))
+output = attention_model(input)
+input = tf.random.uniform(shape=(32, 20, 8))
+output = attention_model(input)
+print(output.shape)

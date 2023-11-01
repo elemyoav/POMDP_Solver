@@ -1,16 +1,17 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Dense, MultiHeadAttention, LayerNormalization, Embedding
-from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, MultiHeadAttention, LayerNormalization
 from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
 from buffers.ReplayBuffer import ReplayBuffer
-from args import args
 import numpy as np
 import random
 from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
+from args import args
+from PositionalEmbedding import positional_encoding
 
 tf.keras.backend.set_floatx('float64')
+
 
 class ActionStateModel:
     def __init__(self, state_dim, aciton_dim):
@@ -21,51 +22,58 @@ class ActionStateModel:
         self.opt = Adam(args.lr)
         self.compute_loss = tf.keras.losses.MeanSquaredError()
         self.model = self.create_model(
-                                        input_shape=(self.state_dim, args.time_steps),
-                                        num_actions=self.action_dim, 
-                                        num_heads=4,
-                                        dff=64,
-                                        num_layers=4, 
-                                        max_seq_length=args.time_steps
-                                      )
+            input_shape=(args.time_steps, self.state_dim),
+            num_heads=8,
+            key_dim=self.state_dim,
+            num_actions = self.action_dim,
+            num_layers=2
+        )
 
-    
-    def create_model(self, input_shape, num_actions, num_heads, dff, num_layers, max_seq_length):
-    # Input for state sequence
-        input_seq = Input(shape=input_shape, dtype=tf.int32, name="input_sequence")
+    def create_model(self, input_shape, num_heads, key_dim, num_actions, num_layers=4):
+        # Input layer
+        
+        inputs = Input(shape=input_shape)
 
-        # Embedding layer
-        embedding_layer = Embedding(input_dim=max_seq_length, output_dim=dff)(input_seq)
-
-        x = embedding_layer
-
+        # project the input at each time step to a number
+        embedded_inputs = Dense(units=key_dim, activation=None)(inputs)
+        
+        # Positional Encoding
+        x = embedded_inputs + positional_encoding(input_shape[0], input_shape[-1])
+        #x = inputs
         for _ in range(num_layers):
-            attn_output = MultiHeadAttention(num_heads=num_heads, key_dim=dff // num_heads)(x, x, x)
-            x = LayerNormalization(epsilon=1e-6)(x + attn_output)
-            ffn_output = Dense(dff, activation="relu")(x)
-            x = LayerNormalization(epsilon=1e-6)(x + ffn_output)
+        # Multi-Head Attention
+            attention_output = MultiHeadAttention(num_heads=num_heads, key_dim=64)(x, x, x, use_causal_mask=True)
+            
+            # Normalize the attention output
+            x = LayerNormalization()(x + attention_output)
 
-        # Global Average Pooling
-        x = tf.reduce_mean(x, axis=1)
+            # send it to a feed forward network
+            #ffn1 = Dense(units=32, activation='relu')(x)
+            #ffn2 = Dense(units=32, activation='tanh')(ffn1)
+            ffn = Dense(units=input_shape[-1], activation='relu')(x)
 
-        # Output layer for action values
-        output = Dense(num_actions, activation="linear", name="action_values")(x)
-
-        # Create the DTQN model
-        model = Model(inputs=input_seq, outputs=output, name="dtqn_model")
-
+            # Normalize the ffn output
+            x = LayerNormalization()(x + ffn)
+        
+        # Output layer
+        output = Dense(units=num_actions, activation=None)(x)
+        
+        # Create the model
+        model = tf.keras.Model(inputs=inputs, outputs=output)
+        model.compile(loss='mse', optimizer=self.opt)
+        
+        model.summary()
         return model
 
-
     def predict(self, state):
-        results = self.model.predict(state, verbose=0)
-        return results
+        return self.model.predict(state, verbose=0)
 
     def get_action(self, state):
         state = np.reshape(state, [1, args.time_steps, self.state_dim])
-        q_value = self.predict(state)[0][-1]
         if np.random.random() < self.epsilon:
             return random.randint(0, self.action_dim-1)
+        q_values = self.predict(state)[0]
+        q_value = q_values[0]
         return np.argmax(q_value)
 
     def train(self, states, targets):
@@ -109,11 +117,12 @@ class Agent:
         for _ in range(epochs):
             states, actions, rewards, next_states, done = self.buffer.sample()
             targets = self.model.predict(states)
-            next_q_values = self.target_model.predict(next_states)
-            max_q_values = np.array([x[-1].max() for x in next_q_values])
-                
-            targets[range(args.batch_size), -1, actions] = rewards + \
-                (1-done) * max_q_values * args.gamma
+            next_q_values = self.target_model.predict(next_states).max(axis=2)
+
+            for i in range(args.batch_size):
+                for j in range(args.time_steps):
+                    targets[i, j, int(actions[i,j])] = rewards[i,j] + (1 - done[i,j]) * args.gamma * next_q_values[i,j]
+
             self.model.train(states, targets)
 
     def update_states(self, next_state):
@@ -128,6 +137,10 @@ class Agent:
                 if ep % 100 == 0:
                     avg = self.test()
                     progression.append(avg)
+                
+                rewards = np.zeros(args.time_steps)
+                dones = np.ones(args.time_steps)
+                actions = np.zeros(args.time_steps)
 
                 done, total_reward = False, 0
                 self.states = np.zeros([args.time_steps, self.state_dim])
@@ -136,10 +149,21 @@ class Agent:
                     action = self.model.get_action(self.states)
                     next_obs, reward, done, _, _ = self.env.step(action)
 
+                    rewards = np.roll(rewards, -1)
+                    rewards[-1] = reward
+
+                    dones = np.roll(dones, -1)
+                    dones[-1] = done
+
+                    actions = np.roll(actions, -1)
+                    actions[-1] = action
+
+
                     prev_states = self.states
                     self.update_states(next_obs)
-                    self.buffer.put(prev_states, action,
-                                    reward, self.states, done)
+                    self.buffer.put(prev_states, actions,
+                                    rewards, self.states, dones)
+                    
                     total_reward += reward
 
                 if self.buffer.size() >= args.batch_size:
@@ -150,10 +174,17 @@ class Agent:
 
         finally:
             self.plot_data(progression)
-
+            
+            c = input('continue_training? [y/n]')
+            if c == 'y':
+                c = input('How many more episodes?')
+                max_episodes = int(c)
+                self.train(max_episodes)
+                return
+            
             c = input('Save model? [y/n]')
             if c == 'y':
-                self.model.model.save(f'./models/DRQN_{args.env}.h5')
+                self.model.model.save(f'./models/{args.model}_{args.env}')
 
 
     def test(self, max_episodes=100):
@@ -161,7 +192,8 @@ class Agent:
         total_rewards = []
         epsilon = self.model.epsilon
         self.model.epsilon = 0
-        for ep in range(max_episodes):
+        #lets add to the for loop a testing.. tqdm format
+        for ep in tqdm(range(max_episodes), desc="Testing..."):
             done, total_reward = False, 0
             self.states = np.zeros([args.time_steps, self.state_dim])
             self.update_states(self.env.reset())
@@ -169,9 +201,9 @@ class Agent:
                 action = self.model.get_action(self.states)
                 next_obs, reward, done, _, _ = self.env.step(action)
 
-                prev_states = self.states
-                self.update_states(next_obs)
-                self.buffer.put(prev_states, action, reward, self.states, done)
+            #    prev_states = self.states
+            #    self.update_states(next_obs)
+            #    self.buffer.put(prev_states, action, reward, self.states, done)
                 total_reward += reward
 
             total_rewards.append(total_reward)
