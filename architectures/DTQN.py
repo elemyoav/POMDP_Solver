@@ -12,6 +12,18 @@ from PositionalEmbedding import positional_encoding
 
 tf.keras.backend.set_floatx('float64')
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Restrict TensorFlow to use only the first GPU
+        tf.config.experimental.set_visible_devices(gpus[0], 'GPU')
+        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+        print(f"{len(gpus)} Physical GPUs, {len(logical_gpus)} Logical GPU")
+    except RuntimeError as e:
+        # In case of an error, fall back to CPU
+        print(e)
+else:
+    print("No GPU available, using CPU.")
 
 class ActionStateModel:
     def __init__(self, state_dim, aciton_dim):
@@ -24,7 +36,7 @@ class ActionStateModel:
         self.model = self.create_model(
             input_shape=(args.time_steps, self.state_dim),
             num_heads=8,
-            key_dim=self.state_dim,
+            key_dim=256,
             num_actions = self.action_dim,
             num_layers=2
         )
@@ -35,22 +47,24 @@ class ActionStateModel:
         inputs = Input(shape=input_shape)
 
         # project the input at each time step to a number
-        embedded_inputs = Dense(units=key_dim, activation=None)(inputs)
+        embedded_inputs1 = Dense(units=key_dim // num_heads, activation='tanh')(inputs)
+        embedded_inputs2 = Dense(units=key_dim , activation='tanh')(embedded_inputs1)
         
         # Positional Encoding
-        x = embedded_inputs + positional_encoding(input_shape[0], input_shape[-1])
-        #x = inputs
+        x = embedded_inputs2 + positional_encoding(input_shape[0], key_dim)
+
         for _ in range(num_layers):
+   
         # Multi-Head Attention
-            attention_output = MultiHeadAttention(num_heads=num_heads, key_dim=64)(x, x, x, use_causal_mask=True)
+            attention_output = MultiHeadAttention(num_heads=num_heads, key_dim=key_dim)(x, x, x, use_causal_mask=True)
             
             # Normalize the attention output
             x = LayerNormalization()(x + attention_output)
 
             # send it to a feed forward network
-            #ffn1 = Dense(units=32, activation='relu')(x)
-            #ffn2 = Dense(units=32, activation='tanh')(ffn1)
-            ffn = Dense(units=input_shape[-1], activation='relu')(x)
+            ffn1 = Dense(units=32, activation='relu')(x)
+            ffn2 = Dense(units=32, activation='tanh')(ffn1)
+            ffn = Dense(units=key_dim, activation='relu')(ffn2)
 
             # Normalize the ffn output
             x = LayerNormalization()(x + ffn)
@@ -73,17 +87,12 @@ class ActionStateModel:
         if np.random.random() < self.epsilon:
             return random.randint(0, self.action_dim-1)
         q_values = self.predict(state)[0]
-        q_value = q_values[0]
+        q_value = q_values[-1]
         return np.argmax(q_value)
 
     def train(self, states, targets):
-        targets = tf.stop_gradient(targets)
-        with tf.GradientTape() as tape:
-            logits = self.model(states, training=True)
-            assert targets.shape == logits.shape
-            loss = self.compute_loss(targets, logits)
-        grads = tape.gradient(loss, self.model.trainable_variables)
-        self.opt.apply_gradients(zip(grads, self.model.trainable_variables))
+        states = tf.convert_to_tensor(states)
+        self.model.fit(states, targets, verbose=0)
 
     def decay_epsilon(self):
         self.epsilon *= args.eps_decay
@@ -119,9 +128,19 @@ class Agent:
             targets = self.model.predict(states)
             next_q_values = self.target_model.predict(next_states).max(axis=2)
 
-            for i in range(args.batch_size):
-                for j in range(args.time_steps):
-                    targets[i, j, int(actions[i,j])] = rewards[i,j] + (1 - done[i,j]) * args.gamma * next_q_values[i,j]
+            not_done_mask = 1.0 - tf.cast(done, dtype=tf.float64)
+
+            #Calculate the Q-value target without the rewards for the done time steps
+            q_value_target = rewards + not_done_mask * args.gamma * next_q_values
+
+            #Convert actions to integers and use it to index the third dimension of targets
+            actions = tf.cast(actions, dtype=tf.int32)
+
+            #Create a mask for the updated elements
+            mask = tf.one_hot(actions, depth=self.action_dim, dtype=tf.float32)
+
+            #Update the 'targets' tensor with Q-value_target for the corresponding actions
+            targets = tf.where(tf.math.equal(mask, 1), q_value_target[..., tf.newaxis], targets)
 
             self.model.train(states, targets)
 
@@ -202,8 +221,9 @@ class Agent:
                 next_obs, reward, done, _, _ = self.env.step(action)
 
             #    prev_states = self.states
-            #    self.update_states(next_obs)
             #    self.buffer.put(prev_states, action, reward, self.states, done)
+            
+                self.update_states(next_obs)
                 total_reward += reward
 
             total_rewards.append(total_reward)

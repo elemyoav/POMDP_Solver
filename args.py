@@ -3,7 +3,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default='DTQN')
 parser.add_argument('--env', type=str, default='Tiger')
-parser.add_argument('--max_episodes', type=int, default=1500)
+parser.add_argument('--max_episodes', type=int, default=2000)
 parser.add_argument('--gamma', type=float, default=0.95)
 parser.add_argument('--lr', type=float, default=5e-5)
 parser.add_argument('--batch_size', type=int, default=32)
