@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-
     
 def positional_encoding(length, depth):
     depth = depth/2

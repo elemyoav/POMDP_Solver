@@ -8,7 +8,7 @@ import random
 from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
 from args import args
-from PositionalEmbedding import positional_encoding
+from utils.positional_encodings import positional_encoding
 
 tf.keras.backend.set_floatx('float64')
 
