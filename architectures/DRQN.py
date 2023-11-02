@@ -9,8 +9,6 @@ from tqdm import tqdm
 from envs.decpomdp2pomdp import DecPOMDPWrapper
 from args import args
 
-tf.keras.layers
-
 tf.keras.backend.set_floatx('float64')
 
 
@@ -27,8 +25,8 @@ class ActionStateModel:
     def create_model(self):
         return tf.keras.Sequential([
             Input((args.time_steps, self.state_dim)),
-            LSTM(512),
-            Dense(1024, activation='relu'),
+            LSTM(32),
+            Dense(32, activation='relu'),
             Dense(self.action_dim)
         ])
 

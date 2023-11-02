@@ -21,9 +21,9 @@ def choose_env(env_name):
     
 def choose_agent(model_name, env):
     if model_name == 'DTQN':
-        return DTQNAgent(env)
+        return DTQNAgent(env, N=args.N)
     elif model_name == 'DRQN':
-        return DRQNAgent(env)
+        return DRQNAgent(env, N=args.N)
     else:
         raise NotImplementedError
     
