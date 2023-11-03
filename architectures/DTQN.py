@@ -38,17 +38,18 @@ class ActionStateModel:
             num_heads=8,
             key_dim=256,
             num_actions = self.action_dim,
-            num_layers=2
+            num_layers=2,
+            dff=256
         )
 
-    def create_model(self, input_shape, num_heads, key_dim, num_actions, num_layers=4):
+    def create_model(self, input_shape, num_heads, key_dim, num_actions, dff, num_layers):
         # Input layer
         
         inputs = Input(shape=input_shape)
 
         # project the input at each time step to a number
-        embedded_inputs1 = Dense(units=key_dim // num_heads, activation='tanh')(inputs)
-        embedded_inputs2 = Dense(units=key_dim , activation='tanh')(embedded_inputs1)
+        embedded_inputs1 = Dense(units=key_dim // num_heads, activation='relu')(inputs)
+        embedded_inputs2 = Dense(units=key_dim)(embedded_inputs1)
         
         # Positional Encoding
         x = embedded_inputs2 + positional_encoding(input_shape[0], key_dim)
@@ -62,12 +63,11 @@ class ActionStateModel:
             x = LayerNormalization()(x + attention_output)
 
             # send it to a feed forward network
-            ffn1 = Dense(units=32, activation='relu')(x)
-            ffn2 = Dense(units=32, activation='tanh')(ffn1)
-            ffn = Dense(units=key_dim, activation='relu')(ffn2)
+            ffn1 = Dense(units=dff, activation='relu')(x)
+            ffn2 = Dense(units=dff, activation=None)(ffn1)
 
             # Normalize the ffn output
-            x = LayerNormalization()(x + ffn)
+            x = LayerNormalization()(x + ffn2)
         
         # Output layer
         output = Dense(units=num_actions, activation=None)(x)
