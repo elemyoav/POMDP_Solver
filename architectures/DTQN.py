@@ -216,14 +216,29 @@ class Agent:
             done, total_reward = False, 0
             self.states = np.zeros([args.time_steps, self.state_dim])
             self.update_states(self.env.reset())
+
+            rewards = np.zeros(args.time_steps)
+            dones = np.ones(args.time_steps)
+            actions = np.zeros(args.time_steps)
             while not done:
                 action = self.model.get_action(self.states)
                 next_obs, reward, done, _, _ = self.env.step(action)
 
-            #    prev_states = self.states
-            #    self.buffer.put(prev_states, action, reward, self.states, done)
-            
+                rewards = np.roll(rewards, -1)
+                rewards[-1] = reward
+
+                dones = np.roll(dones, -1)
+                dones[-1] = done
+
+                actions = np.roll(actions, -1)
+                actions[-1] = action
+
+                prev_states = self.states
                 self.update_states(next_obs)
+
+                self.buffer.put(prev_states, actions,
+                                rewards, self.states, dones)
+                
                 total_reward += reward
 
             total_rewards.append(total_reward)
