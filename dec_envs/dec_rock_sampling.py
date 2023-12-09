@@ -117,50 +117,59 @@ class DecRockSampling(MultiAgentEnv):
         noop = [0]
         move1 = [1, 2, 3, 4]
         move2 = [5, 6, 7, 8]
+        sense = [9, 10]
+        sample = [11, 12]
 
         for action in actions:
             if action in noop:
                 translated_actions.append(("no-op",))
-            elif action in move:
+            elif action in move1:
                 if action == 1:
-                    translated_actions.append(("move",0, "left"))
+                    translated_actions.append(("move", 0, "left"))
                 elif action == 2:
                     translated_actions.append(("move", 0, "right"))
                 elif action == 3:
                     translated_actions.append(("move", 0, "up"))
                 elif action == 4:
                     translated_actions.append(("move", 0, "down"))
-
+            elif action in move2:
+                if action == 5:
+                    translated_actions.append(("move", 1, "left"))
+                elif action == 6:
+                    translated_actions.append(("move", 1, "right"))
+                elif action == 7:
+                    translated_actions.append(("move", 1, "up"))
+                elif action == 8:
+                    translated_actions.append(("move", 1, "down"))
             
-            elif action in sense_small:
-                translated_actions.append(("sense", action - 5, False))
-            elif action in sense_big:
-                translated_actions.append(("sense", action - 5 - k, True))
-            elif action in push_small:
-                box_id = (action - 5 - k - K) // 4
-                direction = (action - 5 - k - K) % 4
+            elif action in sense:
+                if action == 9:
+                    translated_actions.append(("sense", 0))
+                elif action == 10:
+                    translated_actions.append(("sense", 1))
+            
+            elif action in sample:  
+                if action == 11:
+                    translated_actions.append(("sample", 0))
+                elif action == 12:
+                    translated_actions.append(("sample", 1))
 
-                if direction == 0:
-                    translated_actions.append(("push", "left", False, box_id))
-                elif direction == 1:
-                    translated_actions.append(("push", "right", False, box_id))
-                elif direction == 2:
-                    translated_actions.append(("push", "up", False, box_id))
-                elif direction == 3:
-                    translated_actions.append(("push", "down", False, box_id))
-            elif action in push_big:
-                box_id = (action - 5 - k - K - 4 * k) // 4
-                direction = (action - 5 - k - K - 4 * k) % 4
-
-                if direction == 0:
-                    translated_actions.append(("push", "left", True, box_id))
-                elif direction == 1:
-                    translated_actions.append(("push", "right", True, box_id))
-                elif direction == 2:
-                    translated_actions.append(("push", "up", True, box_id))
-                elif direction == 3:
-                    translated_actions.append(("push", "down", True, box_id))
             else:
                 raise IndexError
 
         return translated_actions
+
+    def get_obs(self):
+        old_observations =  self.observations.copy()
+        self.observations = []
+        return [old_observations]
+
+    def reset(self):
+        self.rover1_position = (0, 0)
+        self.rover2_position = (0, self.width - 1)
+        self.sampled_rocks = 0
+        self.step_count = 0
+        self.good_rocks_positions = [self.init_random_location() for _ in range(self.good_rocks)]
+        self.bad_rocks_positions = [self.init_random_location() for _ in range(self.bad_rocks)]
+        self.observations = []
+        return self.get_obs()
